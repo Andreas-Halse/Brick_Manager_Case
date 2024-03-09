@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
-import { Button, Paper, Typography, Grid, Card, CardContent } from '@material-ui/core';
-import { makeStyles } from '@material-ui/core/styles';
-import { createStyles, Theme } from '@material-ui/core/styles';
-
+import { Button, List, ListItem, ListItemText, Paper, Typography } from '@material-ui/core';
+import { makeStyles, createStyles, Theme } from '@material-ui/core/styles';
 
 const useStyles = makeStyles((theme: Theme) =>
     createStyles({
@@ -24,6 +22,16 @@ const useStyles = makeStyles((theme: Theme) =>
         button: {
             marginTop: theme.spacing(2),
         },
+        listContainer: {
+            backgroundColor: '#D0E6A5', // Dusty green background
+            maxWidth: 360,
+            margin: theme.spacing(2),
+            padding: theme.spacing(2),
+            borderRadius: theme.shape.borderRadius,
+        },
+        headline: {
+            marginTop: theme.spacing(4),
+        },
         paper: {
             padding: theme.spacing(2),
             marginBottom: theme.spacing(2),
@@ -41,6 +49,10 @@ const useStyles = makeStyles((theme: Theme) =>
         },
         pieceText: {
             fontSize: '0.91rem',
+        },
+        list: {
+            backgroundColor: theme.palette.background.paper,
+            width: '100%',
         },
     }),
 );
@@ -64,18 +76,36 @@ interface Set {
 interface PieceRequirement {
     part: {
         designID: string;
-        material: number; // Assuming material is a number based on your example, adjust if it's actually a string or other type
+        material: number;
         partType: string;
     };
     quantity: number;
 }
 
+const setEmojis: { [key: string]: string } = {
+    'alien-spaceship': '👽',
+    'beach-buggy': '🏖️',
+    'car-wash': '🚗💦',
+    'castaway': '🏝️',
+    'coffee-bar': '☕',
+    'desert-landscape': '🏜️',
+    'lunar-module': '🚀',
+    'lunar-new-year': '🎉',
+    'observatory-telescope': '🔭',
+    'paris-by-night': '🌙🇫🇷',
+    'peacock-farm': '🦚',
+    'treasure-caves': '💎',
+    'tropical-island': '🌴',
+    'undersea-monster': '🐙',
+    'winter-wonderland': '❄️',
+};
 
 const UserPage: React.FC = () => {
     const classes = useStyles();
     const { username } = useParams<{ username: string }>();
     const [userInventory, setUserInventory] = useState<UserCollection[]>([]);
     const [buildableSets, setBuildableSets] = useState<Set[]>([]);
+    const [showSets, setShowSets] = useState<boolean>(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -83,8 +113,7 @@ const UserPage: React.FC = () => {
                 const userResponse = await axios.get<{ id: string; collection: UserCollection[] }>(`https://d16m5wbro86fg2.cloudfront.net/api/user/by-username/${username}`);
                 const userId = userResponse.data.id;
                 const collectionResponse = await axios.get<{ collection: UserCollection[] }>(`https://d16m5wbro86fg2.cloudfront.net/api/user/by-id/${userId}`);
-                const collection = collectionResponse.data.collection;
-                setUserInventory(collection);
+                setUserInventory(collectionResponse.data.collection);
 
                 const setsResponse = await axios.get<{ Sets: Set[] }>('https://d16m5wbro86fg2.cloudfront.net/api/sets');
                 const Sets = setsResponse.data.Sets;
@@ -93,7 +122,7 @@ const UserPage: React.FC = () => {
                     const setResponse = await axios.get<{ pieces: PieceRequirement[] }>(`https://d16m5wbro86fg2.cloudfront.net/api/set/by-id/${set.id}`);
                     const pieces = setResponse.data.pieces;
                     const canBuild = pieces.every(piece => {
-                        const userPiece = collection.find(up => up.pieceId === piece.part.designID);
+                        const userPiece = collectionResponse.data.collection.find(up => up.pieceId === piece.part.designID);
                         if (!userPiece) return false;
                         const variant = userPiece.variants.find(v => v.color === piece.part.material.toString());
                         return variant && variant.count >= piece.quantity;
@@ -111,16 +140,44 @@ const UserPage: React.FC = () => {
     }, [username]);
 
     const handleButtonClick = () => {
-        console.log(`Sets ${username} can build:`, buildableSets.map(set => set.name));
+        setShowSets(!showSets);
     };
 
-    // Render UI with the obtained data...
     return (
         <div className={classes.root}>
             <h1 className={classes.title}>{`User: ${username}`}</h1>
             <Button variant="contained" color="primary" className={classes.button} onClick={handleButtonClick}>
-                See what sets {username} can create!
+                {showSets ? 'Hide' : 'See'} what sets {username} can create!
             </Button>
+            {showSets && (
+                <>
+                    <Typography variant="h6" className={classes.headline}>
+                        Buildable Sets:
+                    </Typography>
+                    <Paper className={classes.listContainer}>
+                        {buildableSets.length > 0 ? (
+                            <List>
+                                {buildableSets.map((set) => (
+                                    <ListItem key={set.id}>
+                                        <ListItemText primary={
+                                            <span>
+                                                <span style={{ fontSize: '24px' }}>{setEmojis[set.name.toLowerCase()] || '🧱'}</span>
+                                                {' '}
+                                                <span style={{ fontSize: '18px', marginLeft: '10px' }}>{set.name}</span>
+                                            </span>
+                                        } />
+                                    </ListItem>
+
+                                ))}
+                            </List>
+                        ) : (
+                            <Typography variant="body2">
+                                No sets can be built with the current inventory.
+                            </Typography>
+                        )}
+                    </Paper>
+                </>
+            )}
         </div>
     );
 }
